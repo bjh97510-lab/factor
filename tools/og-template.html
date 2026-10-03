@@ -34,7 +34,12 @@
     </div>
   </div>
   <script>
-    document.querySelectorAll("[data-tex]").forEach((el) => { katex.render(el.dataset.tex, el); });
+    document.querySelectorAll("[data-tex]").forEach((el) => katex.render(el.dataset.tex, el));
+    // 공식이 카드보다 길면 글자 크기를 줄여 맞춤 (폰트 로드 후)
+    document.fonts.ready.then(() => document.querySelectorAll(".card .m").forEach((el) => {
+      let s = 26;
+      while (el.scrollWidth > el.clientWidth && s > 14) el.style.fontSize = (--s) + "px";
+    }));
   </script>
 </body>
 </html>
