@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body { width: 1200px; height: 630px; overflow: hidden; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+         background: linear-gradient(135deg, #4338ca 0%, #4f46e5 45%, #059669 100%); color: #fff; position: relative; }
+  .wrap { position: absolute; inset: 0; padding: 64px 72px; display: flex; flex-direction: column; }
+  .badges { display: flex; gap: 12px; }
+  .badge { font-size: 26px; font-weight: 700; padding: 8px 20px; border-radius: 999px; background: rgba(255,255,255,.18); border: 2px solid rgba(255,255,255,.35); }
+  h1 { font-size: 84px; font-weight: 800; letter-spacing: -2px; margin-top: 28px; }
+  .sub { font-size: 32px; opacity: .9; margin-top: 14px; }
+  .cards { margin-top: auto; display: flex; gap: 20px; }
+  .card { flex: 1 1 0; min-width: 0; background: #fff; color: #1e1b4b; border-radius: 20px; padding: 22px 20px; box-shadow: 0 12px 30px rgba(0,0,0,.18); }
+  .card .lbl { font-size: 20px; font-weight: 700; color: #6366f1; margin-bottom: 10px; }
+  .card.h .lbl { color: #059669; }
+  .card .m { font-size: 26px; white-space: nowrap; overflow: hidden; }
+  .deco { position: absolute; right: -40px; top: -60px; font-size: 360px; opacity: .08; font-weight: 800; }
+</style>
+</head>
+<body>
+  <div class="deco">x²</div>
+  <div class="wrap">
+    <div class="badges"><span class="badge">중3</span><span class="badge">고1</span></div>
+    <h1>🧮 곱셈공식 &amp; 인수분해</h1>
+    <div class="sub">플래시카드 · 빈칸 채우기 · 인수분해 연습 — 문제 무한 생성, 실시간 채점</div>
+    <div class="cards">
+      <div class="card"><div class="lbl">곱셈공식 · 중3</div><div class="m" data-tex="(a+b)^2 = a^2+2ab+b^2"></div></div>
+      <div class="card"><div class="lbl">인수분해 · 중3</div><div class="m" data-tex="x^2+5x+6 = (x+2)(x+3)"></div></div>
+      <div class="card h"><div class="lbl">곱셈공식 · 고1</div><div class="m" data-tex="a^3+b^3 = (a+b)(a^2-ab+b^2)"></div></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll("[data-tex]").forEach((el) => { katex.render(el.dataset.tex, el); });
+  </script>
+</body>
+</html>
