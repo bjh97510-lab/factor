@@ -2,7 +2,7 @@
 
 /* =========================================================
  *  곱셈공식 & 인수분해 학습 웹앱
- *  - 학년(중3 / 고1)별 내용은 curriculum.js
+ *  - 학년(중3 / 고1)별 내용은 curriculum.js, 인수 개념 탭 내용은 concept.js
  *  - 모든 학습 상태는 메모리(state)에만 보관 → 새로고침/기록 초기화 시 휘발
  * ========================================================= */
 
@@ -23,6 +23,7 @@ const state = {
   flash: { order: [], idx: 0 },
   blank: null,           // 현재 빈칸 문제
   factor: null,          // 현재 인수분해 문제
+  concept: { order: [], idx: 0, quiz: null }, // 인수 개념 카드 · 확인 문제
 };
 const G = () => CURRICULUM[state.grade];
 
@@ -44,6 +45,13 @@ function tex(el, src, displayMode = false) {
   } else {
     el.textContent = src;
   }
+}
+// HTML 문자열 안의 $…$ (인라인) / $$…$$ (블록) 을 KaTeX로 렌더링
+function mathHtml(html) {
+  const render = (src, displayMode) => (window.katex ? katex.renderToString(src, { throwOnError: false, displayMode }) : escapeHtml(src));
+  return String(html)
+    .replace(/\$\$([^$]+)\$\$/g, (_, t) => render(t, true))
+    .replace(/\$([^$]+)\$/g, (_, t) => render(t, false));
 }
 // 사용자 입력 → 정수 (유니코드 마이너스 허용). 실패 시 null
 function parseIntStrict(raw) {
@@ -313,6 +321,186 @@ function selfCheckFlash(known) {
   moveFlash(1);
 }
 
+/* ---------------- 인수 개념 ---------------- */
+const C = () => G().concept;
+
+// 개념 카드
+function renderConceptCard() {
+  const card = $('conceptCard');
+  const cards = C().cards;
+  const draw = () => {
+    const c = cards[state.concept.order[state.concept.idx]];
+    $('conceptFront').innerHTML = mathHtml(c.q);
+    $('conceptBack').innerHTML = mathHtml(c.a);
+    $('conceptCounter').textContent = `${state.concept.idx + 1} / ${cards.length}`;
+  };
+  if (card.classList.contains('flipped')) {
+    card.classList.remove('flipped');
+    setTimeout(draw, 260);
+  } else draw();
+}
+function moveConceptCard(step) {
+  const n = C().cards.length;
+  state.concept.idx = (state.concept.idx + step + n) % n;
+  renderConceptCard();
+}
+function selfCheckConcept(known) {
+  const c = C().cards[state.concept.order[state.concept.idx]];
+  addRecord({
+    mode: '인수 개념 카드',
+    questionTex: `\\text{${c.t}}`,
+    inputTex: known ? '\\text{알겠어요}' : '\\text{다시 볼래요}',
+    answerTex: '',
+    correct: null,
+  });
+  toast(known ? '😀 좋아요! 다음 카드로 넘어갑니다.' : '🤔 다시 볼 카드로 기록했어요.', 1500);
+  moveConceptCard(1);
+}
+
+// 확인 문제: 유형을 골고루 섞어 한 세트 생성
+function startConceptQuiz() {
+  const types = Object.values(C().quiz);
+  const n = C().quizSize;
+  let pool = [];
+  while (pool.length < n) pool = pool.concat(shuffle(types));
+  const list = pool.slice(0, n).map((t) => Object.assign(t.gen(), { done: false }));
+  state.concept.quiz = { list, idx: 0, score: 0 };
+  $('conceptQuizResult').classList.add('hidden');
+  $('conceptQuizBody').classList.remove('hidden');
+  renderConceptQuestion();
+}
+
+const conceptOptHtml = (o) => (o.tex ? mathHtml(`$${o.tex}$`) : escapeHtml(o.text));
+const conceptOptTex = (o) => o.tex || `\\text{${o.text}}`;
+
+function renderConceptQuestion() {
+  const qz = state.concept.quiz;
+  const q = qz.list[qz.idx];
+  $('conceptQuizProgress').textContent = `${qz.idx + 1} / ${qz.list.length}`;
+  $('conceptQuizBar').style.width = `${(qz.idx / qz.list.length) * 100}%`;
+  $('conceptQuizName').textContent = q.name;
+  $('conceptQuizQ').innerHTML = mathHtml(q.q);
+  $('conceptQuizFeedback').innerHTML = '';
+  $('conceptQuizNext').classList.add('hidden');
+  $('conceptQuizCheck').classList.toggle('hidden', q.type === 'single');
+  $('conceptQuizHint').textContent = { single: '보기를 누르면 바로 채점돼요.', multi: '해당하는 것을 모두 고른 뒤 ‘채점’을 누르세요.', blank: '정수를 입력하고 Enter 또는 ‘채점’을 누르세요.' }[q.type];
+
+  const opts = $('conceptQuizOpts');
+  opts.innerHTML = '';
+  if (q.type === 'blank') {
+    const inp = document.createElement('input');
+    inp.id = 'conceptBlankInput';
+    inp.type = 'text';
+    inp.inputMode = 'numeric';
+    inp.autocomplete = 'off';
+    inp.className = 'num-input rounded-lg border border-slate-300 px-2 py-2 text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500';
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitConceptQuiz(); } });
+    opts.appendChild(inp);
+    inp.focus({ preventScroll: true });
+    return;
+  }
+  q.options.forEach((o) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'opt-btn';
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = conceptOptHtml(o);
+    b.addEventListener('click', () => {
+      if (q.done) return;
+      if (q.type === 'single') {
+        [...opts.children].forEach((x) => x.setAttribute('aria-pressed', 'false'));
+        b.setAttribute('aria-pressed', 'true');
+        submitConceptQuiz();
+      } else {
+        b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+      }
+    });
+    opts.appendChild(b);
+  });
+}
+
+function submitConceptQuiz() {
+  const qz = state.concept.quiz;
+  if (!qz) return;
+  const q = qz.list[qz.idx];
+  if (!q || q.done) return;
+  const fb = $('conceptQuizFeedback');
+  let ok, inputTex, answerTex, wrongNote = '';
+
+  if (q.type === 'blank') {
+    const inp = $('conceptBlankInput');
+    const val = parseIntStrict(inp.value);
+    if (val === null) {
+      inp.classList.add('shake');
+      setTimeout(() => inp.classList.remove('shake'), 300);
+      fb.innerHTML = '<span class="text-amber-600">정수를 입력해 주세요.</span>';
+      return;
+    }
+    ok = val === q.answer;
+    inputTex = String(val);
+    answerTex = String(q.answer);
+    inp.disabled = true;
+    inp.classList.add(ok ? 'border-emerald-500' : 'border-rose-500');
+    if (!ok) wrongNote = ` 정답은 <b>${q.answer}</b>`;
+  } else {
+    const btns = [...$('conceptQuizOpts').children];
+    const chosen = btns.map((b) => b.getAttribute('aria-pressed') === 'true');
+    if (!chosen.some(Boolean)) {
+      fb.innerHTML = '<span class="text-amber-600">보기를 골라 주세요.</span>';
+      return;
+    }
+    ok = q.options.every((o, i) => Boolean(o.ok) === chosen[i]);
+    inputTex = q.options.filter((_, i) => chosen[i]).map(conceptOptTex).join(',\\;');
+    answerTex = q.options.filter((o) => o.ok).map(conceptOptTex).join(',\\;');
+    btns.forEach((b, i) => {
+      b.disabled = true;
+      const o = q.options[i];
+      b.classList.add(o.ok ? (chosen[i] ? 'opt-ok' : 'opt-miss') : chosen[i] ? 'opt-bad' : 'opt-dim');
+    });
+    if (!ok && q.type === 'multi') wrongNote = ' (실선 초록 = 맞게 고름, 점선 초록 = 골랐어야 함, 빨강 = 잘못 고름)';
+  }
+
+  q.done = true;
+  if (ok) qz.score += 1;
+  addRecord({ mode: '인수 개념', questionTex: q.tex, inputTex, answerTex, correct: ok });
+
+  const last = qz.idx === qz.list.length - 1;
+  $('conceptQuizCheck').classList.add('hidden');
+  const next = $('conceptQuizNext');
+  next.textContent = last ? '결과 보기 ▶' : '다음 문제 ▶';
+  next.classList.remove('hidden');
+  fb.innerHTML = `<div class="${ok ? 'text-emerald-600' : 'text-rose-600'} font-bold text-lg">${ok ? '⭕ 정답입니다!' : '❌ 아쉬워요.'}<span class="text-sm font-normal text-slate-500">${wrongNote}</span></div>
+    <div class="mt-2 text-sm text-slate-700 bg-slate-50 rounded-lg p-3 text-left leading-relaxed">💬 ${mathHtml(q.explain)}</div>
+    <div class="text-xs text-slate-400 mt-2">Enter 또는 ‘${last ? '결과 보기' : '다음 문제'}’를 눌러 계속하세요.</div>`;
+  next.focus({ preventScroll: true });
+}
+
+function nextConceptQuestion() {
+  const qz = state.concept.quiz;
+  if (!qz || !qz.list[qz.idx]?.done) return;
+  qz.idx += 1;
+  if (qz.idx >= qz.list.length) { showConceptResult(); return; }
+  renderConceptQuestion();
+}
+
+function showConceptResult() {
+  const qz = state.concept.quiz;
+  const n = qz.list.length, s = qz.score;
+  $('conceptQuizProgress').textContent = `${n} / ${n}`;
+  $('conceptQuizBar').style.width = '100%';
+  $('conceptQuizBody').classList.add('hidden');
+  const r = $('conceptQuizResult');
+  r.classList.remove('hidden');
+  const msg = s === n ? '🎉 완벽해요! 인수 개념을 확실히 이해했어요.'
+    : s >= n * 0.7 ? '👍 잘했어요! 틀린 문제는 학습 내역에서 다시 확인해 보세요.'
+      : '🤔 위의 설명과 개념 카드를 다시 읽고 한 번 더 풀어 보세요.';
+  r.innerHTML = `<div class="text-sm text-slate-500">개념 확인 문제 결과</div>
+    <div class="text-4xl font-bold my-2 ${s === n ? 'text-emerald-600' : 'text-indigo-600'}">${s} <span class="text-xl text-slate-400">/ ${n}</span></div>
+    <div class="text-slate-700">${msg}</div>
+    <button id="conceptQuizRestart" class="mt-4 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2">🔁 새 문제로 다시 풀기</button>`;
+  $('conceptQuizRestart').addEventListener('click', startConceptQuiz);
+}
+
 /* ---------------- 기록 & 통계 ---------------- */
 function addRecord(r) {
   r.grade = G().short;
@@ -408,6 +596,14 @@ function selectGrade(key) {
   state.flash.order = g.formulas.map((_, i) => i);
   state.flash.idx = 0;
   $('flashCard').classList.remove('flipped');
+  // 인수 개념 탭
+  $('conceptExplainBody').innerHTML = mathHtml(g.concept.explain);
+  $('conceptExplain').open = true;
+  state.concept.order = g.concept.cards.map((_, i) => i);
+  state.concept.idx = 0;
+  $('conceptCard').classList.remove('flipped');
+  renderConceptCard();
+  startConceptQuiz();
   $('startView').classList.add('hidden');
   $('mainView').classList.remove('hidden');
   renderFlash();
@@ -461,6 +657,27 @@ function init() {
     if (document.activeElement === $('blankSkip')) return;
     e.preventDefault();
     newBlankQuestion();
+  });
+
+  // 인수 개념
+  $('conceptCard').addEventListener('click', () => $('conceptCard').classList.toggle('flipped'));
+  $('conceptFlip').addEventListener('click', () => $('conceptCard').classList.toggle('flipped'));
+  $('conceptPrev').addEventListener('click', () => moveConceptCard(-1));
+  $('conceptNext').addEventListener('click', () => moveConceptCard(1));
+  $('conceptShuffle').addEventListener('click', () => { state.concept.order = shuffle(state.concept.order); state.concept.idx = 0; renderConceptCard(); toast('🔀 카드를 섞었어요.', 1200); });
+  $('conceptKnow').addEventListener('click', () => selfCheckConcept(true));
+  $('conceptDontKnow').addEventListener('click', () => selfCheckConcept(false));
+  $('conceptQuizCheck').addEventListener('click', submitConceptQuiz);
+  $('conceptQuizNext').addEventListener('click', nextConceptQuestion);
+  $('factorConceptLink').addEventListener('click', () => { showTab('concept'); window.scrollTo(0, 0); });
+  // 채점이 끝난 문제에서 Enter → 다음 문제
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || $('tab-concept').classList.contains('hidden') || $('mainView').classList.contains('hidden')) return;
+    const qz = state.concept.quiz;
+    if (!qz || !qz.list[qz.idx]?.done) return;
+    if (document.activeElement?.tagName === 'BUTTON') return; // 버튼에 포커스가 있으면 클릭 처리에 맡김
+    e.preventDefault();
+    nextConceptQuestion();
   });
 
   // 인수분해

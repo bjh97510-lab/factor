@@ -45,6 +45,21 @@
     .shake { animation: shake .3s; }
     @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
     .tab-btn[aria-selected="true"] { background: #4f46e5; color: #fff; }
+    /* 인수 개념 탭 */
+    .concept-face .katex { font-size: 1.2em; }
+    #conceptExplainBody .katex { font-size: 1.05em; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .chev { display: inline-block; transition: transform .2s; }
+    details[open] > summary .chev { transform: rotate(90deg); }
+    .opt-btn { border: 2px solid #cbd5e1; border-radius: .6rem; padding: .5rem 1rem; background: #fff; transition: all .15s; }
+    .opt-btn:hover:not(:disabled) { background: #f1f5f9; }
+    .opt-btn[aria-pressed="true"] { border-color: #4f46e5; background: #eef2ff; color: #3730a3; }
+    .opt-btn.opt-ok { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+    .opt-btn.opt-miss { border-color: #10b981; border-style: dashed; background: #f0fdf4; color: #065f46; }
+    .opt-btn.opt-bad { border-color: #f43f5e; background: #fff1f2; color: #9f1239; }
+    .opt-btn.opt-dim { opacity: .45; }
+    .opt-btn:disabled { cursor: default; }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
@@ -104,10 +119,11 @@
 
       <!-- 탭 -->
       <nav class="bg-white rounded-xl shadow-sm p-1 flex gap-1" role="tablist">
-        <button class="tab-btn flex-1 rounded-lg py-2 text-sm font-semibold transition" data-tab="flash" aria-selected="true">플래시카드</button>
-        <button class="tab-btn flex-1 rounded-lg py-2 text-sm font-semibold transition" data-tab="blank" aria-selected="false">빈칸 채우기</button>
-        <button class="tab-btn flex-1 rounded-lg py-2 text-sm font-semibold transition" data-tab="factor" aria-selected="false">인수분해</button>
-        <button class="tab-btn flex-1 rounded-lg py-2 text-sm font-semibold transition" data-tab="history" aria-selected="false">학습 내역</button>
+        <button class="tab-btn flex-1 rounded-lg py-2 px-1 text-xs sm:text-sm font-semibold transition" data-tab="flash" aria-selected="true">플래시카드</button>
+        <button class="tab-btn flex-1 rounded-lg py-2 px-1 text-xs sm:text-sm font-semibold transition" data-tab="blank" aria-selected="false">빈칸 채우기</button>
+        <button class="tab-btn flex-1 rounded-lg py-2 px-1 text-xs sm:text-sm font-semibold transition" data-tab="concept" aria-selected="false">인수 개념</button>
+        <button class="tab-btn flex-1 rounded-lg py-2 px-1 text-xs sm:text-sm font-semibold transition" data-tab="factor" aria-selected="false">인수분해</button>
+        <button class="tab-btn flex-1 rounded-lg py-2 px-1 text-xs sm:text-sm font-semibold transition" data-tab="history" aria-selected="false">학습 내역</button>
       </nav>
 
       <!-- 플래시카드 -->
@@ -165,11 +181,77 @@
         </div>
       </div>
 
+      <!-- 인수 개념 -->
+      <div id="tab-concept" class="tab-panel hidden space-y-5">
+        <!-- 설명 -->
+        <details id="conceptExplain" class="bg-white rounded-xl shadow-sm p-4 sm:p-6" open>
+          <summary class="font-bold cursor-pointer select-none flex items-center gap-2">
+            <span class="chev text-slate-400">▶</span>📖 인수(因數)란?
+            <span class="text-xs font-normal text-slate-400">눌러서 접기/펼치기</span>
+          </summary>
+          <div id="conceptExplainBody" class="mt-4 text-sm sm:text-base leading-relaxed"></div>
+        </details>
+
+        <!-- 개념 카드 뒤집기 -->
+        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold">🃏 개념 카드 뒤집기</h2>
+            <span id="conceptCounter" class="text-sm text-slate-500"></span>
+          </div>
+          <div id="conceptCard" class="flip-card cursor-pointer select-none" title="클릭하여 뒤집기">
+            <div class="flip-inner h-60 sm:h-64">
+              <div class="flip-face concept-face rounded-xl bg-sky-600 text-white flex flex-col items-center justify-center p-5 text-center">
+                <div class="text-xs opacity-80 mb-3">질문</div>
+                <div id="conceptFront" class="text-base sm:text-lg leading-relaxed overflow-y-auto max-w-full"></div>
+                <div class="text-xs opacity-70 mt-4">카드를 눌러 확인</div>
+              </div>
+              <div class="flip-face concept-face flip-back rounded-xl bg-emerald-50 border-2 border-emerald-500 text-emerald-900 flex flex-col items-center justify-center p-5 text-center">
+                <div class="text-xs opacity-70 mb-3">답</div>
+                <div id="conceptBack" class="text-base sm:text-lg leading-relaxed overflow-y-auto max-w-full"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 justify-center mt-4">
+            <button id="conceptPrev" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">◀ 이전</button>
+            <button id="conceptFlip" class="rounded-lg bg-slate-800 text-white px-4 py-2 text-sm hover:bg-slate-700">뒤집기</button>
+            <button id="conceptNext" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">다음 ▶</button>
+            <button id="conceptShuffle" class="rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100">🔀 섞기</button>
+          </div>
+          <div class="flex gap-2 justify-center mt-3">
+            <button id="conceptKnow" class="rounded-lg bg-emerald-100 text-emerald-800 px-4 py-2 text-sm hover:bg-emerald-200">😀 알겠어요</button>
+            <button id="conceptDontKnow" class="rounded-lg bg-rose-100 text-rose-800 px-4 py-2 text-sm hover:bg-rose-200">🤔 다시 볼래요</button>
+          </div>
+        </div>
+
+        <!-- 개념 확인 문제 -->
+        <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-bold">✏️ 개념 확인 문제</h2>
+            <span id="conceptQuizProgress" class="text-sm text-slate-500"></span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden mb-4">
+            <div id="conceptQuizBar" class="h-full bg-indigo-500 transition-all" style="width:0%"></div>
+          </div>
+          <div id="conceptQuizBody">
+            <div id="conceptQuizName" class="text-sm text-indigo-600 font-medium mb-2"></div>
+            <div id="conceptQuizQ" class="bg-slate-50 rounded-lg p-4 text-base sm:text-lg leading-relaxed"></div>
+            <p id="conceptQuizHint" class="text-xs text-slate-400 text-center mt-3"></p>
+            <div id="conceptQuizOpts" class="flex flex-wrap items-center justify-center gap-2 mt-2"></div>
+            <div class="flex flex-wrap gap-2 justify-center mt-4">
+              <button id="conceptQuizCheck" class="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2">채점</button>
+              <button id="conceptQuizNext" class="hidden rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2">다음 문제 ▶</button>
+            </div>
+            <div id="conceptQuizFeedback" class="mt-4 text-center min-h-[3rem]"></div>
+          </div>
+          <div id="conceptQuizResult" class="hidden text-center py-4"></div>
+        </div>
+      </div>
+
       <!-- 인수분해 -->
       <div id="tab-factor" class="tab-panel hidden">
         <div class="bg-white rounded-xl shadow-sm p-4 sm:p-6">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 class="font-bold">인수분해 연습</h2>
+            <h2 class="font-bold">인수분해 연습 <button type="button" id="factorConceptLink" class="ml-1 align-middle text-xs font-normal text-indigo-600 underline hover:text-indigo-800">인수가 뭐였더라? 개념 보기</button></h2>
             <div class="flex flex-wrap gap-2">
             <select id="factorKind" class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"></select>
             <select id="factorLevel" class="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
@@ -213,6 +295,7 @@
   <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden max-w-[90vw] rounded-lg bg-slate-900 text-white text-sm px-4 py-3 shadow-lg"></div>
 
   <script src="curriculum.js"></script>
+  <script src="concept.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
